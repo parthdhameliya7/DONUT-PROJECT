@@ -5,11 +5,11 @@ from typing import Optional, Tuple
 
 class Transforms:
 
-    def __init__(self, image_size : Optional[Tuple] = (256, 256), aug_p : float = 0.2):
+    def __init__(self, image_size : Optional[Tuple[int, int]] = (256, 256), aug_p : float = 0.2) -> None:
         self.image_size = image_size
         self.aug_p = aug_p
 
-    def get_transforms(self):
+    def get_transforms(self) -> Tuple[A.Compose, A.Compose]:
         train_transform = A.Compose([
             A.Resize(self.image_size[0], self.image_size[1]),
             #A.Normalize(mean = cfg['MEAN'], std = cfg['STD']),

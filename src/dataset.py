@@ -4,14 +4,17 @@ import pandas as pd
 from ast import literal_eval
 
 from torch.utils.data import Dataset 
-from typing import Optional, Any
+from typing import Optional, Any, TypedDict
 
+class DataDict(TypedDict):
+    images: torch.Tensor
+    targets: str
 
 class DonutDataset(Dataset):
     def __init__(self,
                  df : pd.DataFrame = None,
-                 data_dir : Optional[str] = None,
-                 dataset_dir : Optional[str] = None,
+                 data_dir : Optional[str] = '',
+                 dataset_dir : Optional[str] = '',
                  augmentations : Optional[Any] = None,
                  ) -> None:
 
@@ -23,7 +26,7 @@ class DonutDataset(Dataset):
     def __len__(self) -> int:
         return len(self.df)
 
-    def __getitem__(self, index : int) -> dict:
+    def __getitem__(self, index : int) -> DataDict:
 
         row = self.df.iloc[index]
         filepath = row.filepaths #retrived filepath
