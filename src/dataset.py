@@ -27,11 +27,12 @@ class DonutDataset(Dataset):
         row = self.df.iloc[index]
         filepath = row.filepaths #retrived filepath
         filepath = f'{self.data_dir}{self.dataset_dir}{filepath}' #processed filepath
-        images = cv2.imread(filepath)
+        image = cv2.imread(filepath)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         ground_truth = row.ground_truth
 
         return {
-            'images' : images,
+            'images' : image,
             'targets' : ground_truth 
         }
 
