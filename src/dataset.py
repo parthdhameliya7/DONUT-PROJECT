@@ -31,6 +31,9 @@ class DonutDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         ground_truth = row.ground_truth
 
+        if self.augmentations is not None:
+            image = self.augmentations(image = image)['image']
+
         return {
             'images' : image,
             'targets' : ground_truth 

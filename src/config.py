@@ -11,6 +11,9 @@ params = {
     'valid_csv' : 'data_csv/valid_dataset.csv',
     'test_csv' : 'data_csv/test_dataset.csv',
 
+    #IMAGE PARAMS 
+    'image_size' : (615, 475),
+    'aug_p' : 0.3,
 
 
 }
