@@ -1,7 +1,6 @@
 from src.config import *
 from typing import Any
 
-new_special_tokens = []
 def json2token(obj : Any, update_special_tokens_for_json_key: bool = False, sort_json_key: bool = True) -> Any:
         """
         Convert an ordered JSON object into a token sequence
@@ -32,6 +31,6 @@ def json2token(obj : Any, update_special_tokens_for_json_key: bool = False, sort
         else:
             # excluded special tokens for now
             obj = str(obj)
-            if f"<{obj}/>" in new_special_tokens:
+            if f"<{obj}/>" in params['special_tokens']:
                 obj = f"<{obj}/>"  # for categorical special tokens
             return obj
