@@ -1,6 +1,7 @@
 import torch 
 import cv2
 import pandas as pd
+from ast import literal_eval
 
 from torch.utils.data import Dataset 
 from typing import Optional, Any
@@ -30,12 +31,13 @@ class DonutDataset(Dataset):
         image = cv2.imread(filepath)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         ground_truth = row.ground_truth
+        target = literal_eval(ground_truth)['gt_parse']
 
         if self.augmentations is not None:
             image = self.augmentations(image = image)['image']
 
         return {
             'images' : image,
-            'targets' : ground_truth 
+            'targets' : target 
         }
 
