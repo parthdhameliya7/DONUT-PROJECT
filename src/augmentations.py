@@ -1,10 +1,11 @@
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 from src.config import * 
+from typing import Optional, Tuple
 
 class Transforms:
 
-    def __init__(self, image_size, aug_p = 0.2):
+    def __init__(self, image_size : Optional[Tuple] = (256, 256), aug_p : float = 0.2):
         self.image_size = image_size
         self.aug_p = aug_p
 
