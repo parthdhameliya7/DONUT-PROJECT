@@ -12,8 +12,7 @@ from src.config import *
 class DonutModel(Model):
     def __init__(self, donut) -> None:
         super().__init__()
-
-        #Vision encoder decoder configurations
+        print('bug-fix')
         self.donut = donut
 
     def monitor_metrics(self, outputs, target_sequences)-> Dict[None, None]:
