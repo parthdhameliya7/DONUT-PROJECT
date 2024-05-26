@@ -2,35 +2,35 @@ from torchret import Model
 import torch.nn as nn 
 import torch
 import re 
+from src.dataset import DonutDataset
 
 from nltk import edit_distance
 from typing import Optional, Dict
-from transformers import VisionEncoderDecoderConfig, VisionEncoderDecoderModel
 from src.config import *
 
 
 class DonutModel(Model):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, donut) -> None:
+        super().__init__()
 
         #Vision encoder decoder configurations
-        self.processor = None
-        self.config = VisionEncoderDecoderConfig.from_pretrained("naver-clova-ix/donut-base")
-        self.config.encoder.image_size = list(params['image_size'])
-        self.config.decoder.max_length = params['max_length']
-
-        #Initializing model with assigned configurations
-        self.donut_model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base", config=self.config)
-        self.donut_model.decoder.resize_token_embeddings(len(self.processor.tokenizer), pad_to_multiple_of=16)
-
-        self.donut_model.config.pad_token_id = self.processor.tokenizer.pad_token_id
-        self.donut_model.config.decoder_start_token_id = self.processor.tokenizer.convert_tokens_to_ids(['<s-donut>'])[0]
+        self.donut = donut
 
     def monitor_metrics(self, outputs, target_sequences)-> Dict[None, None]:
         return {}
     
     def valid_metrics(self, outputs, target_sequences)-> Dict[str, float]:
         return {}
+
+    def model_fn(self, data):
+        data['images'] = data['images'].to(self.device)
+        data['targets'] = data['targets'].to(self.device)
+        if self.fp16 is not None:
+            with torch.cuda.amp.autocast():
+                output, loss, metrics = self(**data)
+        else:
+            output, loss, metrics = self(**data)
+        return output, loss, metrics
     
     def valid_model_fn(self, data):
         for k, v in data.items():
@@ -85,21 +85,11 @@ class DonutModel(Model):
 
     def forward(self,
                 images : Optional[torch.Tensor] = None,
-                targets : Optional[str] = None,
+                targets : Optional[torch.Tensor] = None,
                 target_sequences : Optional[str] = None) -> torch.Tensor:
         
-        outputs = self.donut_model(images)
+        outputs = self.donut(pixel_values = images, labels = targets)
         logits = outputs.logits
-
-        if target_sequences is not None:
-            loss = outputs.loss
-            if self.training is True:
-                metrics = self.monitor_metrics(outputs, target_sequences)
-                return logits, loss, metrics
-            else:
-                return logits, loss
-        return logits, 0, {}
-
-            
-
-
+        loss = outputs.loss
+        metrics = self.monitor_metrics(outputs, target_sequences)
+        return logits, loss, metrics

@@ -3,12 +3,12 @@ import pickle
 params = {
 
     #DATA PATH SETUP 
-    'data_dir' : 'data/',
+    'data_dir' : '/home/dhameliya.pa/DONUT-PROJECT/data/',
 
     'train_data_dir' : 'train_dataset/',
     'valid_data_dir' : 'valid_dataset/',
     'test_data_dir' : 'test_dataset/',
-    'data_csv' : 'data_csv/',
+    'data_csv' : '/home/dhameliya.pa/DONUT-PROJECT/data_csv/',
     
     'train_csv' : 'train_dataset.csv',
     'valid_csv' : 'valid_dataset.csv',
@@ -38,7 +38,7 @@ params = {
 
     #FIT PARAMS
     'epochs' : 15,
-    'train_bs' : 64,
+    'train_bs' : 12,
     'valid_bs' : 16,
 
 

@@ -2,7 +2,7 @@ import torch
 import cv2
 import pandas as pd
 from src.config import * 
-from src.utils import json2token, new_special_tokens
+from src.utils import json2token
 from ast import literal_eval
 import pickle
 
