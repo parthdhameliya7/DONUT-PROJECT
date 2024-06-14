@@ -18,8 +18,17 @@ class DonutModel(Model):
     def monitor_metrics(self, outputs, target_sequences)-> Dict[None, None]:
         return {}
     
-    def valid_metrics(self, outputs, target_sequences)-> Dict[str, float]:
-        return {}
+    def setup_logger(self):
+        neptune_api = NEPTUNE_API_KEY
+        self.run = neptune.init_run(
+            project='fenilsavani62/Digit-recog',
+            api_token=neptune_api,
+            capture_stdout=True,   
+            capture_stderr=True,      
+            capture_traceback=True,    
+            capture_hardware_metrics=True,  
+            source_files='*.py' 
+        )
 
     def model_fn(self, data):
         data['images'] = data['images'].to(self.device)
