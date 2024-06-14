@@ -3,19 +3,26 @@ import pickle
 params = {
 
     #DATA PATH SETUP 
-    'data_dir' : '/home/dhameliya.pa/DONUT-PROJECT/data/',
+    'data_dir' : 'data/',
 
     'train_data_dir' : 'train_dataset/',
     'valid_data_dir' : 'valid_dataset/',
     'test_data_dir' : 'test_dataset/',
-    'data_csv' : '/home/dhameliya.pa/DONUT-PROJECT/data_csv/',
-    
+    'data_csv' : 'data_csv/',
+
+    'model_path' : 'models/donut_model_0.0.1.pt',
+    'save_best_model' : 'on_eval_metric',
+    'save_on_metric' : 'edit_distance',
+    'save_model_at_every_epoch' : False,
+
     'train_csv' : 'train_dataset.csv',
     'valid_csv' : 'valid_dataset.csv',
     'test_csv' : 'test_dataset.csv',
 
     #IMAGE PARAMS 
-    'image_size' : (615, 475),
+    'image_size' : (900, 650),
+    'mean' : [0.485, 0.456, 0.406],
+    'std' : [0.229, 0.224, 0.225],
     'aug_p' : 0.3,
 
     #TARGET PROCESSOR 
@@ -26,9 +33,9 @@ params = {
     'vocab_size' : None,
 
     #OPTIMIZER AND SCHEDULER
-    'lr' : 1e-5,
+    'lr' : 1e-4,
     'eta_min' : 1e-6,
-    'T_0' : 15,
+    'T_0' : 30,
     'step_scheduler_after' : 'epoch',
     #on_eval_loss
 
@@ -37,9 +44,9 @@ params = {
     'num_workers' : 12,
 
     #FIT PARAMS
-    'epochs' : 15,
-    'train_bs' : 12,
-    'valid_bs' : 16,
+    'epochs' : 30,
+    'train_bs' : 8,
+    'valid_bs' : 8,
 
 
 }

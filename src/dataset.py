@@ -65,4 +65,3 @@ class DonutDataset(Dataset):
             'target_sequences' : target_sequence,
             'targets' : labels 
         }
-

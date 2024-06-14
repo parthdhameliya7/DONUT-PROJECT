@@ -1,9 +1,6 @@
 data/
 eda_stuff.ipynb
-<<<<<<< HEAD
-.DS_Store
-=======
 .DS_Store
 .neptune
 /data
->>>>>>> 74e73ce (added raw data)
+DONUT-PROJECT.code-workspace

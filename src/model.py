@@ -2,24 +2,37 @@ from torchret import Model
 import torch.nn as nn 
 import torch
 import re 
+from ast import literal_eval
 from src.dataset import DonutDataset
+from src.custom_optimizers import Ranger
 
 from nltk import edit_distance
 from typing import Optional, Dict
 from src.config import *
-
+import numpy as np 
+import neptune
+from neptune.utils import stringify_unsupported
+from neptune.types import File
 
 class DonutModel(Model):
-    def __init__(self, donut) -> None:
+    def __init__(self, donut, processor) -> None:
         super().__init__()
-        print('bug-fix')
         self.donut = donut
+        self.processor = processor
+        self.ignore_for_device = 'target_sequences'
 
-    def monitor_metrics(self, outputs, target_sequences)-> Dict[None, None]:
-        return {}
+        self.model_path = params['model_path']
+        self.save_best_model = params['save_best_model']
+        self.save_on_metric = params['save_on_metric']
+        self.save_model_at_every_epoch = params['save_model_at_every_epoch']
+
+        self.num_workers = 12
+        self.pin_memory = True
+        self.scheduler = True
+        self.step_scheduler_after = 'epoch'
     
     def setup_logger(self):
-        neptune_api = NEPTUNE_API_KEY
+        neptune_api = NEPTUNE_API_TOKEN
         self.run = neptune.init_run(
             project='fenilsavani62/Digit-recog',
             api_token=neptune_api,
@@ -30,27 +43,41 @@ class DonutModel(Model):
             source_files='*.py' 
         )
 
-    def model_fn(self, data):
-        data['images'] = data['images'].to(self.device)
-        data['targets'] = data['targets'].to(self.device)
-        if self.fp16 is not None:
-            with torch.cuda.amp.autocast():
-                output, loss, metrics = self(**data)
-        else:
-            output, loss, metrics = self(**data)
-        return output, loss, metrics
+    def valid_one_step_logs(self, batch_id, data, logits, loss, metrics, temp_pred, temp_answer):
+        if batch_id % len(self.validloader) == 6:
+            images = data['images']
+            images = images.permute(0, 2, 3, 1).squeeze().cpu()
+            for i in range(len(images)):
+
+                description = f'''
+                true label : {temp_answer[i]} 
+                
+                prediction : {temp_pred[i]}
+                '''
+                
+                self.run["valid/prediction_example"].append(File.as_image(images[i]), description = description)
+
+    def train_one_epoch_logs(self, loss, monitor):
+        self.run['train/loss'].append(loss)
     
-    def valid_model_fn(self, data):
+    def valid_one_epoch_logs(self, loss, monitor):
+        self.run['valid/loss'].append(loss)
+        self.run['valid/monitors'].append(monitor)
+    
+    def valid_model_fn(self, batch_id, data):
         for k, v in data.items():
-            data[k] = v.to(self.device)
-            batch_size = data[k].shape[0]
+            if k == self.ignore_for_device:
+                pass
+            else:
+                data[k] = v.to(self.device)
+                batch_size = data[k].shape[0]
         answers = data['target_sequences']
-        decoder_input_ids = torch.full((batch_size, 1), self.donut_model.config.decoder_start_token_id, device = self.device)
-        output = self.donut_model.generate(
+        decoder_input_ids = torch.full((batch_size, 1), self.donut.config.decoder_start_token_id, device = self.device)
+        output = self.donut.generate(
                 data['images'],
                 decoder_input_ids = decoder_input_ids,
                 max_length = params['max_length'],
-                early_stopping = True, 
+                early_stopping = False, 
                 pad_token_id = self.processor.tokenizer.pad_token_id,
                 eos_token_id = self.processor.tokenizer.eos_token_id,
                 use_cache = True, 
@@ -66,21 +93,68 @@ class DonutModel(Model):
             predictions.append(seq)
 
         scores = list()
+        temp_pred = []
+        temp_answer = []
+        
         for pred, answer in zip(predictions, answers):
             pred = re.sub(r"(?:(?<=>) | (?=</s_))", "", pred)
             answer = answer.replace(self.processor.tokenizer.eos_token, "")
             sim = edit_distance(pred, answer) / max(len(pred), len(answer))
             scores.append(1 - sim)
-        metrics = {'edit_distance' : sum(scores)}
+            j_pred = self.processor.token2json(pred)
+            temp_pred.append(j_pred)
+            j_answer = self.processor.token2json(answer)
+            temp_answer.append(j_answer)
+
+        final_score = torch.tensor(sum(scores) / len(scores))
+        metrics = {'edit_distance' : final_score}
+
+        return temp_pred, temp_answer, output_logits, loss, metrics
+
+    def monitor_metrics(self, images, target_sequences):
+
+        answers = target_sequences
+        batch_size = images.shape[0]
+        decoder_input_ids = torch.full((batch_size, 1), self.donut.config.decoder_start_token_id, device = self.device)
+        output = self.donut.generate(
+                images,
+                decoder_input_ids = decoder_input_ids,
+                max_length = params['max_length'],
+                early_stopping = False, 
+                pad_token_id = self.processor.tokenizer.pad_token_id,
+                eos_token_id = self.processor.tokenizer.eos_token_id,
+                use_cache = True, 
+                num_beams = 1,
+                bad_words_ids = [[self.processor.tokenizer.unk_token_id]],
+                return_dict_in_generate = True
+            )
+        predictions = []
+        for seq in self.processor.tokenizer.batch_decode(output.sequences):
+            seq = seq.replace(self.processor.tokenizer.eos_token, "").replace(self.processor.tokenizer.pad_token, "")
+            seq = re.sub(r"<.*?>", "", seq, count=1).strip()  
+            predictions.append(seq)
+
+        scores = list()
         
-        return output_logits, loss, metrics
+        for pred, answer in zip(predictions, answers):
+            pred = re.sub(r"(?:(?<=>) | (?=</s_))", "", pred)
+            answer = answer.replace(self.processor.tokenizer.eos_token, "")
+            sim = edit_distance(pred, answer) / max(len(pred), len(answer))
+            scores.append(1 - sim)
+
+        final_score = torch.tensor(sum(scores) / len(scores))
+        metrics = {'edit_distance' : final_score}
+
+        return metrics
     
-    def valid_one_step(self, data):
-        _, loss, metrics = self.valid_model_fn(data)
+    def valid_one_step(self, batch_id, data):
+        temp_pred, temp_answer, _, loss, metrics = self.valid_model_fn(batch_id, data)
+        if self.logger is True:
+            self.valid_one_step_logs(batch_id, data, _, loss, metrics, temp_pred, temp_answer)
         return loss, metrics
     
     def fetch_optimizer(self):
-        opt = torch.optim.AdamW(
+        opt = Ranger(
             self.parameters(),
             lr=params['lr'],
         )
@@ -99,5 +173,7 @@ class DonutModel(Model):
         outputs = self.donut(pixel_values = images, labels = targets)
         logits = outputs.logits
         loss = outputs.loss
-        metrics = self.monitor_metrics(outputs, target_sequences)
-        return logits, loss, metrics
+        if self.training is True:
+            metrics = self.monitor_metrics(images, target_sequences)
+            return logits, loss, metrics
+        return logits, loss
