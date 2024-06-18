@@ -1,5 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.providers.google.cloud.transfers.gcs_to_local import GCSToLocalFilesystemOperator
 from datetime import datetime
 import pandas as pd
 import glob
@@ -8,11 +9,17 @@ import json
 from ast import literal_eval
 from PIL import Image
 import io
+import subprocess
+import shutil
+import sys
+
+os.environ["AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT"] = 'google-cloud-platform://'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/Users/parth/Desktop/DONUT-PROJECT/dags/new-keys.json'
 
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': datetime(2024, 6, 10),
+    'start_date': datetime.now(),
     'retries': 1,
 }
 
@@ -23,9 +30,35 @@ dag = DAG(
     schedule_interval=None,
 )
 
+def pull_data_from_dvc():
+    try:
+        # Run the DVC pull command
+        result = subprocess.run(['dvc', 'pull'], capture_output=True, text=True)
+
+        # Check if the command was successful
+        if result.returncode == 0:
+            print("DVC pull successful.")
+            print(result.stdout)
+        else:
+            print("DVC pull failed.")
+            print(result.stderr)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        sys.exit(1)
+
 train_path = glob.glob('data/train*.parquet')
 valid_path = glob.glob('data/valid*.parquet')
 test_path = glob.glob('data/test*.parquet')
+
+def delete_data_folder():
+    try:
+        # Delete the data folder
+        shutil.rmtree('data')
+        print("Data folder deleted successfully.")
+    except Exception as e:
+        print(f"An error occurred while deleting the data folder: {e}")
+        sys.exit(1)
 
 def load_df(file_path: str):
     return pd.read_parquet(file_path)
@@ -213,6 +246,8 @@ def create_csvs(**kwargs):
     df = get_dataframe(all_image_filepaths, all_json_filepaths)
     filename = f'{CSVs[0]}/dataset_{time}.csv'
     save_csvs_to_directory(df, filename)
+    delete_data_folder()
+
 
 load_and_concat_data_task = PythonOperator(
     task_id='load_and_concat_data',
@@ -263,6 +298,13 @@ create_csvs_task = PythonOperator(
     dag=dag,
 )
 
+pull_data_from_dvc_task = PythonOperator(
+    task_id='pull_data_from_dvc',
+    python_callable=pull_data_from_dvc,
+    dag=dag,
+)
+
+pull_data_from_dvc_task >> load_and_concat_data_task
 load_and_concat_data_task >> create_directories_task
 create_directories_task >> save_images_task
 

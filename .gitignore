@@ -2,4 +2,9 @@ data/
 eda_stuff.ipynb
 .DS_Store
 .neptune
-/data
+data
+images 
+jsons 
+csvs
+keys.json
+dags/new-keys.json
