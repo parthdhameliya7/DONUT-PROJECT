@@ -9,7 +9,7 @@ from ast import literal_eval
 from PIL import Image
 from google.cloud import storage
 from gcsfs import GCSFileSystem
-# from gcs_utils import list_files_with_pattern, download_from_gcs
+from gcs_utils import list_files_with_pattern, download_from_gcs
 import fnmatch
 import io
 
