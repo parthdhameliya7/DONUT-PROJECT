@@ -1,0 +1,10 @@
+pandas
+glob2
+tqdm
+Pillow
+apache-airflow
+numpy
+dvc
+dvc-gs
+google-cloud-storage
+gcsfs
