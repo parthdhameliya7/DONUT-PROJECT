@@ -64,7 +64,16 @@ RUN dvc add data/fenil.txt && \
 
 RUN dvc push
 
+RUN  rm -f data/fenil.txt
+RUN  rm -rf .dvc/cache
 
+# # Pull the data from the remote storage
+
+RUN dvc pull
+
+# Track the pulled data files with Git and commit
+RUN git add data/fenil.txt && \
+    git commit -m "Pulled data from DVC and added to Git"
 
 
 # Add remote file to DVC for version control, commit to DVC, and commit .dvc file to Git
