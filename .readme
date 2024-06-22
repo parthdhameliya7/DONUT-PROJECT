@@ -1,0 +1,9 @@
+First, Created docker-compose.yaml file with necessary mount volume for project directory.
+
+Second, Created Dockerfile to build docker image for airflow configurations.
+
+Third, created load_data.py file which will run dag tasks .
+
+Fourth, Created gcs_utils.py file which will pull data from gcs bucket.
+
+Initialized dvc for data version control for our project.
