@@ -96,7 +96,43 @@ def get_dataframe(image_filepath, json_filepaths):
     df = pd.DataFrame(dataframe_dict)
     return df
 
+def get_path_gcs(**kwargs):
+    bucket_name = 'donut-dataset'
+    train_path = list_files_with_pattern(bucket_name, 'data/train*.parquet')
+    valid_path = list_files_with_pattern(bucket_name, 'data/valid*.parquet')
+    test_path = list_files_with_pattern(bucket_name, 'data/test*.parquet')
 
+    
+    kwargs['ti'].xcom_push(key='train_path', value=train_path)
+    kwargs['ti'].xcom_push(key='valid_path', value=valid_path)
+    kwargs['ti'].xcom_push(key='test_path', value=test_path)
+
+
+
+
+def download_datasets(**kwargs):
+    bucket_name = 'donut-dataset'
+    
+    ti = kwargs['ti']
+    train_paths = ti.xcom_pull(key='train_path', task_ids='get_path_gcs')
+    valid_paths = ti.xcom_pull(key='valid_path', task_ids='get_path_gcs')
+    test_paths = ti.xcom_pull(key='test_path', task_ids='get_path_gcs')
+
+    docker_dir = '/opt/airflow/data'
+    
+    for path in train_paths:
+        destination = os.path.join(docker_dir, os.path.basename(path))
+        print(destination)
+        download_from_gcs(bucket_name, path, destination)
+
+    for path in valid_paths:
+        destination = os.path.join(docker_dir, os.path.basename(path))
+        download_from_gcs(bucket_name, path, destination)
+
+    for path in test_paths:
+        destination = os.path.join(docker_dir, os.path.basename(path))
+        download_from_gcs(bucket_name, path, destination)
+ 
 def load_and_concat_data(**kwargs):
     ti = kwargs['ti']
     train_path = ti.xcom_pull(task_ids='get_path_gcs', key='train_path')
