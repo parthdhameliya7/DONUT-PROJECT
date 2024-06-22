@@ -43,7 +43,12 @@ class DonutModel(Model):
             source_files='*.py' 
         )
 
+    def train_one_step_logs(self, batch_id, data, logits, loss, metrics):
+        self.run['train/step-loss'].append(loss)
+
+
     def valid_one_step_logs(self, batch_id, data, logits, loss, metrics, temp_pred, temp_answer):
+        self.run['valid/step-loss'].append(loss)
         if batch_id % len(self.validloader) == 6:
             images = data['images']
             images = images.permute(0, 2, 3, 1).squeeze().cpu()
