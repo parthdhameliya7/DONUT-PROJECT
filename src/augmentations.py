@@ -20,7 +20,7 @@ class Transforms:
             #A.Superpixels(n_segments=10000, max_size= 615, p = 0.4),
             A.Defocus(radius=(1, 2), alias_blur=(0, 0.05), p = 0.3),
             A.ImageCompression(quality_lower=20, quality_upper=21, p = 0.3),
-            A.Cutout(num_holes = 55, max_h_size = 10, max_w_size = 10, fill_value = 0, p = 0.65),
+            A.Cutout(num_holes = 10, max_h_size = 10, max_w_size = 10, fill_value = 0, p = 0.50),
             ToTensorV2(p = 1.0)
         ], additional_targets = {'image' : 'image'})
 

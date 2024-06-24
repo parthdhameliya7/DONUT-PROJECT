@@ -1,4 +1,5 @@
 import torch 
+import json
 import cv2
 import pandas as pd
 from src.config import * 
@@ -37,12 +38,12 @@ class DonutDataset(Dataset):
     def __getitem__(self, index : int) -> DataDict:
 
         row = self.df.iloc[index]
-        filepath = row.filepaths #retrived filepath
-        filepath = f'{self.data_dir}{self.dataset_dir}{filepath}' #processed filepath
-        image = cv2.imread(filepath)
+        img_filepath = row.image_filepath 
+        json_filepath = row.json_filepaths
+        image = cv2.imread(img_filepath)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        ground_truth = row.ground_truth
-        target = literal_eval(ground_truth)['gt_parse']
+        f = open(json_filepath)
+        target = json.load(f)
 
         target_sequence = json2token(target) + self.processor.tokenizer.eos_token
         input_ids = self.processor.tokenizer(

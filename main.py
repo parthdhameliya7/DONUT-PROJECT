@@ -10,6 +10,9 @@ import pandas as pd
 from transformers import DonutProcessor
 from transformers import VisionEncoderDecoderConfig, VisionEncoderDecoderModel
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 train_df = pd.read_csv(params['data_csv'] + params['train_csv'])
 valid_df = pd.read_csv(params['data_csv'] + params['valid_csv'])
 
@@ -46,7 +49,7 @@ donut.decoder.resize_token_embeddings(len(processor.tokenizer), pad_to_multiple_
 donut.config.pad_token_id = processor.tokenizer.pad_token_id
 donut.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids([params['start_token']])[0]
 
-model = DonutModel(donut)
+model = DonutModel(donut, processor)
 model.fit(
     train_dataset = train_dataset,
     valid_dataset = valid_dataset,

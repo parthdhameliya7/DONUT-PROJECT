@@ -1,6 +1,7 @@
 from torchret import Model 
 import torch.nn as nn 
 import torch
+import json
 import re 
 from ast import literal_eval
 from src.dataset import DonutDataset
@@ -32,16 +33,17 @@ class DonutModel(Model):
         self.step_scheduler_after = 'epoch'
     
     def setup_logger(self):
-        neptune_api = NEPTUNE_API_TOKEN
+        neptune_api = input('Enter-neptune-key : ')
         self.run = neptune.init_run(
-            project='fenilsavani62/Digit-recog',
+            project=input('Enter-project-name : '),
             api_token=neptune_api,
             capture_stdout=True,   
             capture_stderr=True,      
             capture_traceback=True,    
             capture_hardware_metrics=True,  
-            source_files='*.py' 
+            source_files='src/*.py' 
         )
+        self.run['parameters'] = params
 
     def train_one_step_logs(self, batch_id, data, logits, loss, metrics):
         self.run['train/step-loss'].append(loss)
@@ -53,17 +55,12 @@ class DonutModel(Model):
             images = data['images']
             images = images.permute(0, 2, 3, 1).squeeze().cpu()
             for i in range(len(images)):
-
-                description = f'''
-                true label : {temp_answer[i]} 
-                
-                prediction : {temp_pred[i]}
-                '''
-                
+                description = f'True Label:{temp_answer[i]}\nPrediction:{temp_pred[i]}'
                 self.run["valid/prediction_example"].append(File.as_image(images[i]), description = description)
 
     def train_one_epoch_logs(self, loss, monitor):
         self.run['train/loss'].append(loss)
+        self.run['train/monitors'].append(monitor)
     
     def valid_one_epoch_logs(self, loss, monitor):
         self.run['valid/loss'].append(loss)
