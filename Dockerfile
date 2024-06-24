@@ -66,22 +66,6 @@ RUN dvc add data1 && \
 
 RUN dvc push
 
-RUN  rm -rf data1
-# RUN  rm -rf .dvc/cache
-
-# # Pull the data from the remote storage
-
-RUN dvc pull
-
-# # Track the pulled data files with Git and commit
-RUN git add -f data1 && \
-    git commit -m "Pulled data from DVC and added to Git"
-
-
-# RUN git rm -r --cached data1 && \
-#     git commit -m "stop tracking data1"
-
-
 # Add safe directory exception in Git config
 RUN git config --global --add safe.directory /opt/airflow
 
