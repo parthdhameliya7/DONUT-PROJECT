@@ -12,7 +12,8 @@ from gcsfs import GCSFileSystem
 from gcs_utils import list_files_with_pattern, download_from_gcs
 import fnmatch
 import io
-
+import subprocess
+import sys
  
 default_args = {
     'owner': 'airflow',
@@ -28,8 +29,52 @@ dag = DAG(
     schedule_interval=None,
 )
 
-    
- 
+def pull_data_from_dvc():
+    try:
+        # Check if data1 directory exists and remove it if it does
+        if os.path.exists('/opt/airflow/data1'):
+            print("Removing existing data1 directory.")
+            result = subprocess.run(['rm', '-rf', '/opt/airflow/data1'], capture_output=True, text=True)
+            if result.returncode == 0:
+                print("data1 directory removed successfully.")
+            else:
+                print("Failed to remove data1 directory.")
+                print(result.stderr)
+
+        # Run the DVC pull command
+        result = subprocess.run(['dvc', 'pull'], capture_output=True, text=True)
+        
+        # Check if the DVC pull command was successful
+        if result.returncode == 0:
+            print("DVC pull successful.")
+            print(result.stdout)
+
+            # Track the pulled data files with Git
+            git_add_result = subprocess.run(['git', 'add', '-f', 'data1'], capture_output=True, text=True)
+            if git_add_result.returncode == 0:
+                print("Git add successful.")
+                print(git_add_result.stdout)
+                
+                # Commit the changes
+                git_commit_result = subprocess.run(['git', 'commit', '-m', 'Pulled data from DVC and added to Git'], capture_output=True, text=True)
+                if git_commit_result.returncode == 0:
+                    print("Git commit successful.")
+                    print(git_commit_result.stdout)
+                else:
+                    print("Git commit failed.")
+                    print(git_commit_result.stderr)
+            else:
+                print("Git add failed.")
+                print(git_add_result.stderr)
+        else:
+            print("DVC pull failed.")
+            print(result.stderr)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        sys.exit(1)
+
+
 def load_df(file_path: str):
     gcs = GCSFileSystem()
     bucket_name = 'donut-dataset'
