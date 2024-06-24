@@ -11,13 +11,15 @@ USER airflow
 WORKDIR /opt/airflow
 
 # Create necessary directories
-RUN mkdir -p /opt/airflow/dags /opt/airflow/data
+RUN mkdir -p /opt/airflow/dags /opt/airflow/data1 
+# change here data with data1 -----
 
 
 # Copy the DAGs folder to the container
 COPY dags/ /opt/airflow/dags/
 
-COPY data/ /opt/airflow/data/
+COPY data1/ /opt/airflow/data1/  
+#--------change data1 with data forr this is testing:
 
 
 COPY config/ /opt/airflow/config/
@@ -49,54 +51,39 @@ RUN git init && \
 
 # Initialize DVC repository, add files, and commit
 RUN dvc init 
-
-RUN dvc remote add -d gcs_remote gs://donut-dataset/test 
+# change folder with data below:
+RUN dvc remote add -d gcs_remote gs://donut-dataset/data1   
 RUN git add .dvc/config && \
-    git commit -m "DVC setup"  
+    git commit -m "DVC setup for data1."  
     
     # Stop tracking data/fenil.txt from Git
-RUN git rm -r --cached data/fenil.txt && \
+RUN git rm -r --cached data1 && \
     git commit -m "Stop tracking data/fenil.txt"
 
-RUN dvc add data/fenil.txt && \
-    git add data/fenil.txt.dvc data/.gitignore && \
+RUN dvc add data1 && \
+    git add data1.dvc && \
     git commit -m "Added data file and tracked by git"
 
 RUN dvc push
 
-RUN  rm -f data/fenil.txt
-RUN  rm -rf .dvc/cache
+RUN  rm -rf data1
+# RUN  rm -rf .dvc/cache
 
 # # Pull the data from the remote storage
 
 RUN dvc pull
 
-# Track the pulled data files with Git and commit
-RUN git add data/fenil.txt && \
+# # Track the pulled data files with Git and commit
+RUN git add -f data1 && \
     git commit -m "Pulled data from DVC and added to Git"
 
 
-# Add remote file to DVC for version control, commit to DVC, and commit .dvc file to Git
-# Add the data folder to DVC for version control
+# RUN git rm -r --cached data1 && \
+#     git commit -m "stop tracking data1"
 
-# RUN git rm -r --cached data/fenil.txt && \
-#     git commit -m "stop tracking data/fenil.txt"
-
-# RUN dvc add data/fenil.txt && \
-#     dvc commit 
-
-# Pull the data from the remote storage
-# RUN dvc pull -r gcs_remote && \
-#     dvc add data && \
-#     dvc commit
-
-# RUN git add data.dvc  && \
-#     git commit -m "Version control added for datafenil.txt.dvc"
 
 # Add safe directory exception in Git config
 RUN git config --global --add safe.directory /opt/airflow
-
-
 
 # Expose the port
 EXPOSE 8080
