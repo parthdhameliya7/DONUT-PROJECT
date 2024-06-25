@@ -60,11 +60,11 @@ RUN git add .dvc/config && \
 RUN git rm -r --cached data1 && \
     git commit -m "Stop tracking data/fenil.txt"
 
-RUN dvc add data1 && \
-    git add data1.dvc && \
-    git commit -m "Added data file and tracked by git"
+# RUN dvc add data1 && \
+#     git add data1.dvc && \
+#     git commit -m "Added data file and tracked by git"
 
-RUN dvc push
+# RUN dvc push
 
 # Add safe directory exception in Git config
 RUN git config --global --add safe.directory /opt/airflow
