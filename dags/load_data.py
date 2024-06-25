@@ -11,10 +11,13 @@ from google.cloud import storage
 from gcsfs import GCSFileSystem
 from gcs_utils import list_files_with_pattern, download_from_gcs
 import fnmatch
-import io
 import subprocess
 import sys
- 
+import io
+
+os.environ["AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT"] = 'google-cloud-platform://'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/opt/airflow/config/advance-anvil-425519-u2-b2800cb795f5.json'
+
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -23,7 +26,7 @@ default_args = {
 }
  
 dag = DAG(
-    'Fenil_line_1',
+    'Fenil_line_3',
     default_args=default_args,
     description='A simple data processing DAG',
     schedule_interval=None,
@@ -56,7 +59,8 @@ def pull_data_from_dvc():
                 print(git_add_result.stdout)
                 
                 # Commit the changes
-                git_commit_result = subprocess.run(['git', 'commit', '-m', 'Pulled data from DVC and added to Git'], capture_output=True, text=True)
+                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                git_commit_result = subprocess.run(['git', 'commit', '-m', f'Pulled data from DVC and added to Git at {current_time}'], capture_output=True, text=True)
                 if git_commit_result.returncode == 0:
                     print("Git commit successful.")
                     print(git_commit_result.stdout)
@@ -72,16 +76,12 @@ def pull_data_from_dvc():
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        sys.exit(1)
+        sys.exit(1)    
 
-
+ 
 def load_df(file_path: str):
-    gcs = GCSFileSystem()
-    bucket_name = 'donut-dataset'
-
-    with gcs.open(f'{bucket_name}/{file_path}', 'rb') as f:
-        return pd.read_parquet(f)
-   
+    return pd.read_parquet(file_path)
+ 
 def concat_data(data_list):
     return pd.concat(data_list, axis=0).reset_index().drop(['index'], axis=1)
  
@@ -140,54 +140,29 @@ def get_dataframe(image_filepath, json_filepaths):
     }
     df = pd.DataFrame(dataframe_dict)
     return df
-
-def get_path_gcs(**kwargs):
-    bucket_name = 'donut-dataset'
-    train_path = list_files_with_pattern(bucket_name, 'data/train*.parquet')
-    valid_path = list_files_with_pattern(bucket_name, 'data/valid*.parquet')
-    test_path = list_files_with_pattern(bucket_name, 'data/test*.parquet')
-
-    
+ 
+ 
+def get_parquet_file_path(**kwargs):
+    base_dir = 'data1' # attach folder name where data will pull
+    train_path = glob.glob(os.path.join(base_dir, 'train*.parquet'))
+    valid_path = glob.glob(os.path.join(base_dir, 'valid*.parquet'))
+    test_path = glob.glob(os.path.join(base_dir, 'test*.parquet'))
     kwargs['ti'].xcom_push(key='train_path', value=train_path)
     kwargs['ti'].xcom_push(key='valid_path', value=valid_path)
     kwargs['ti'].xcom_push(key='test_path', value=test_path)
+    # add more line for push
+    print(test_path)
+    return train_path, valid_path, test_path  #
 
-
-
-
-def download_datasets(**kwargs):
-    bucket_name = 'donut-dataset'
-    
-    ti = kwargs['ti']
-    train_paths = ti.xcom_pull(key='train_path', task_ids='get_path_gcs')
-    valid_paths = ti.xcom_pull(key='valid_path', task_ids='get_path_gcs')
-    test_paths = ti.xcom_pull(key='test_path', task_ids='get_path_gcs')
-
-    docker_dir = '/opt/airflow/data'
-    
-    for path in train_paths:
-        destination = os.path.join(docker_dir, os.path.basename(path))
-        print(destination)
-        download_from_gcs(bucket_name, path, destination)
-
-    for path in valid_paths:
-        destination = os.path.join(docker_dir, os.path.basename(path))
-        download_from_gcs(bucket_name, path, destination)
-
-    for path in test_paths:
-        destination = os.path.join(docker_dir, os.path.basename(path))
-        download_from_gcs(bucket_name, path, destination)
- 
 def load_and_concat_data(**kwargs):
     ti = kwargs['ti']
-    train_path = ti.xcom_pull(task_ids='get_path_gcs', key='train_path')
-    valid_path = ti.xcom_pull(task_ids='get_path_gcs', key='valid_path')
-    test_path = ti.xcom_pull(task_ids='get_path_gcs', key='test_path')
-    
+    # add more line for pull
+    train_path = ti.xcom_pull(key='train_path', task_ids='read_parquet_file_path')
+    valid_path = ti.xcom_pull(key='valid_path', task_ids='read_parquet_file_path')
+    test_path = ti.xcom_pull(key='test_path', task_ids='read_parquet_file_path')
     train_df = concat_data([load_df(i) for i in train_path]).iloc[:2]
     valid_df = concat_data([load_df(i) for i in valid_path]).iloc[:2]
     test_df = concat_data([load_df(i) for i in test_path]).iloc[:2]
-
     kwargs['ti'].xcom_push(key='train_df', value=train_df)
     kwargs['ti'].xcom_push(key='valid_df', value=valid_df)
     kwargs['ti'].xcom_push(key='test_df', value=test_df)
@@ -295,6 +270,7 @@ def save_jsons(**kwargs):
     kwargs['ti'].xcom_push(key='test_json_filepaths', value=test_filepaths)
  
 def create_csvs(**kwargs):
+
     ti = kwargs['ti']
     time = ti.xcom_pull(key='time', task_ids='create_directories')
     train_image_filepaths = ti.xcom_pull(key='train_image_filepaths', task_ids='save_images')
@@ -305,23 +281,23 @@ def create_csvs(**kwargs):
     test_json_filepaths = ti.xcom_pull(key='test_json_filepaths', task_ids='save_jsons')
     CSVS = ti.xcom_pull(key='CSVS', task_ids='create_directories')
  
-    all_image_filepaths = train_image_filepaths + valid_image_filepaths + test_image_filepaths
-    all_json_filepaths = train_json_filepaths + valid_json_filepaths + test_json_filepaths
+    all_image_filepaths = train_image_filepaths + valid_image_filepaths + test_image_filepaths #
+    all_json_filepaths = train_json_filepaths + valid_json_filepaths + test_json_filepaths  #
  
     df = get_dataframe(all_image_filepaths, all_json_filepaths)
     filename = f'{CSVS[0]}/dataset_{time}.csv' 
     save_csvs_to_directory(df, filename)
 
-get_path_gcs_task = PythonOperator(
-    task_id='get_path_gcs',
-    python_callable=get_path_gcs,
+pull_data_dvc_task = PythonOperator(
+    task_id='pull_data_dvc',
+    python_callable=pull_data_from_dvc,
     provide_context=True,
     dag=dag,
 )
 
-download_datasets_task = PythonOperator(
-    task_id='download_datasets',
-    python_callable=download_datasets,
+read_parquet_file_path_task = PythonOperator(
+    task_id='read_parquet_file_path',
+    python_callable=get_parquet_file_path,
     provide_context=True,
     dag=dag,
 )
@@ -375,7 +351,7 @@ create_csvs_task = PythonOperator(
     dag=dag,
 )
  
-get_path_gcs_task >> download_datasets_task >> load_and_concat_data_task >> create_directories_task
+pull_data_dvc_task >> read_parquet_file_path_task >> load_and_concat_data_task >> create_directories_task
 create_directories_task >> save_images_task
  
 create_directories_task >> extract_ground_truth_strings_task
@@ -383,5 +359,3 @@ extract_ground_truth_strings_task >> convert_strings_to_json_task
 convert_strings_to_json_task >> save_jsons_task
  
 [save_images_task, save_jsons_task] >> create_csvs_task
-
-
