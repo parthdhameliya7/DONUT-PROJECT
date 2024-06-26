@@ -13,6 +13,7 @@ from gcs_utils import list_files_with_pattern, download_from_gcs
 import fnmatch
 import subprocess
 import sys
+import logging
 import io
 
 os.environ["AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT"] = 'google-cloud-platform://'
@@ -34,14 +35,18 @@ dag = DAG(
 
 
 def pull_data_from_dvc():
+    logger = logging.getLogger('pull_data_from_dvc')
     try:
         # Check if data1 directory exists and remove it if it does
         if os.path.exists('/opt/airflow/data1'):
+            logger.info("Removing existing data1 directory.")
             print("Removing existing data1 directory.")
             result = subprocess.run(['rm', '-rf', '/opt/airflow/data1'], capture_output=True, text=True)
             if result.returncode == 0:
+                logger.info("data1 directory removed successfully.")
                 print("data1 directory removed successfully.")
             else:
+                logger.error("Failed to remove data1 directory.")
                 print("Failed to remove data1 directory.")
                 print(result.stderr)
 
@@ -50,8 +55,8 @@ def pull_data_from_dvc():
         
         # Check if the DVC pull command was successful
         if result.returncode == 0:
-            print("DVC pull successful.")
-            print(result.stdout)
+            logger.info("DVC pull successful.")
+            logger.info(result.stdout)
 
             # Track the pulled data files with Git
             git_add_result = subprocess.run(['git', 'add', '-f', 'data1'], capture_output=True, text=True)
@@ -63,21 +68,21 @@ def pull_data_from_dvc():
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 git_commit_result = subprocess.run(['git', 'commit', '-m', f'Pulled data from DVC and added to Git at {current_time}'], capture_output=True, text=True)
                 if git_commit_result.returncode == 0:
-                    print("Git commit successful.")
-                    print(git_commit_result.stdout)
+                   logger.info("Git commit successful.")
+                   logger.info(git_commit_result.stdout)
                 else:
-                    print("Git commit failed.")
-                    print(git_commit_result.stderr)
+                    logger.error("Git commit failed.")
+                    logger.error(git_commit_result.stderr)
             else:
-                print("Git add failed.")
-                print(git_add_result.stderr)
+                logger.error("Git add failed.")
+                logger.error(git_add_result.stderr)
         else:
-            print("DVC pull failed.")
-            print(result.stderr)
+            logger.error("DVC pull failed.")
+            logger.error(result.stderr)
 
     except Exception as e:
-        print(f"An error occurred: {e}")
-        sys.exit(1)    
+        logger.error(f"An error occurred: {e}")
+        sys.exit(1)
 
  
 def load_df(file_path: str):
@@ -144,6 +149,7 @@ def get_dataframe(image_filepath, json_filepaths):
  
  
 def get_parquet_file_path(**kwargs):
+    logger = logging.getLogger('get_parquet_file_path')
     base_dir = 'data1' # attach folder name where data will pull
     train_path = glob.glob(os.path.join(base_dir, 'train*.parquet'))
     valid_path = glob.glob(os.path.join(base_dir, 'valid*.parquet'))
@@ -151,11 +157,15 @@ def get_parquet_file_path(**kwargs):
     kwargs['ti'].xcom_push(key='train_path', value=train_path)
     kwargs['ti'].xcom_push(key='valid_path', value=valid_path)
     kwargs['ti'].xcom_push(key='test_path', value=test_path)
+    logger.info(f"Train path: {train_path}")
+    logger.info(f"Valid path: {valid_path}")
+    logger.info(f"Test path: {test_path}")
     # add more line for push
     print(test_path)
     return train_path, valid_path, test_path  #
 
 def load_and_concat_data(**kwargs):
+    logger = logging.getLogger('load_and_concat_data')
     ti = kwargs['ti']
     # add more line for pull
     train_path = ti.xcom_pull(key='train_path', task_ids='read_parquet_file_path')
@@ -167,8 +177,10 @@ def load_and_concat_data(**kwargs):
     kwargs['ti'].xcom_push(key='train_df', value=train_df)
     kwargs['ti'].xcom_push(key='valid_df', value=valid_df)
     kwargs['ti'].xcom_push(key='test_df', value=test_df)
+    logger.info("Dataframes loaded and concatenated.")
  
 def create_directories(**kwargs):  # Data Directories are created and stored in to airflow-worker-1 this container :
+    logger = logging.getLogger('create_directories')
     time = datetime.now().strftime('%Y-%m-%d-%H:%M:%S')
     IMG_DIRECTS = [
         f'/opt/airflow/images/train_images_{time}',
@@ -190,8 +202,10 @@ def create_directories(**kwargs):  # Data Directories are created and stored in 
     kwargs['ti'].xcom_push(key='IMG_DIRECTS', value=IMG_DIRECTS)
     kwargs['ti'].xcom_push(key='JSON_DIRECTS', value=JSON_DIRECTS)
     kwargs['ti'].xcom_push(key='CSVS', value=CSVS)
+    logger.info("Directories created.")
  
 def save_images(**kwargs):
+    logger = logging.getLogger('save_images')
     ti = kwargs['ti']
     time = ti.xcom_pull(key='time', task_ids='create_directories')
     IMG_DIRECTS = ti.xcom_pull(key='IMG_DIRECTS', task_ids='create_directories')
@@ -206,8 +220,10 @@ def save_images(**kwargs):
     kwargs['ti'].xcom_push(key='train_image_filepaths', value=train_filepaths)
     kwargs['ti'].xcom_push(key='valid_image_filepaths', value=valid_filepaths)
     kwargs['ti'].xcom_push(key='test_image_filepaths', value=test_filepaths)
+    logger.info("Images saved.")
  
 def extract_ground_truth_strings(**kwargs):
+    logger = logging.getLogger('extract_ground_truth_strings')
     ti = kwargs['ti']
     train_df = ti.xcom_pull(key='train_df', task_ids='load_and_concat_data')
     valid_df = ti.xcom_pull(key='valid_df', task_ids='load_and_concat_data')
@@ -220,8 +236,10 @@ def extract_ground_truth_strings(**kwargs):
     kwargs['ti'].xcom_push(key='train_gt_strings', value=train_gt_strings)
     kwargs['ti'].xcom_push(key='valid_gt_strings', value=valid_gt_strings)
     kwargs['ti'].xcom_push(key='test_gt_strings', value=test_gt_strings)
+    logger.info("extract_ground_truth_strings saved.")
  
 def convert_strings_to_json(**kwargs):
+    logger = logging.getLogger('convert_strings_to_json')
     ti = kwargs['ti']
     train_gt_strings = ti.xcom_pull(key='train_gt_strings', task_ids='extract_ground_truth_strings')
     valid_gt_strings = ti.xcom_pull(key='valid_gt_strings', task_ids='extract_ground_truth_strings')
@@ -234,8 +252,10 @@ def convert_strings_to_json(**kwargs):
     kwargs['ti'].xcom_push(key='train_jsons', value=train_jsons)
     kwargs['ti'].xcom_push(key='valid_jsons', value=valid_jsons)
     kwargs['ti'].xcom_push(key='test_jsons', value=test_jsons)
+    logger.info("convert_strings_to_json saved.")
  
 def save_jsons(**kwargs):
+    logger = logging.getLogger('save_jsons')
     ti = kwargs['ti']
     time = ti.xcom_pull(key='time', task_ids='create_directories')
     JSON_DIRECTS = ti.xcom_pull(key='JSON_DIRECTS', task_ids='create_directories')
@@ -247,6 +267,7 @@ def save_jsons(**kwargs):
     train_filepaths = []
     valid_filepaths = []
     test_filepaths = []
+    
  
     for idx, json_data in enumerate(train_jsons):
         filename = generate_filename(idx, JSON_DIRECTS[0], 'train', time, '.json')
@@ -269,9 +290,11 @@ def save_jsons(**kwargs):
     kwargs['ti'].xcom_push(key='train_json_filepaths', value=train_filepaths)
     kwargs['ti'].xcom_push(key='valid_json_filepaths', value=valid_filepaths)
     kwargs['ti'].xcom_push(key='test_json_filepaths', value=test_filepaths)
- 
-def create_csvs(**kwargs):
+    
+    logger.info("JSON files saved.")
 
+def create_csvs(**kwargs):
+    logger = logging.getLogger('create_csvs')
     ti = kwargs['ti']
     time = ti.xcom_pull(key='time', task_ids='create_directories')
     train_image_filepaths = ti.xcom_pull(key='train_image_filepaths', task_ids='save_images')
@@ -288,6 +311,8 @@ def create_csvs(**kwargs):
     df = get_dataframe(all_image_filepaths, all_json_filepaths)
     filename = f'{CSVS[0]}/dataset_{time}.csv' 
     save_csvs_to_directory(df, filename)
+
+    logger.info("csvs files saved.")
 
 
 pull_data_dvc_task = PythonOperator(

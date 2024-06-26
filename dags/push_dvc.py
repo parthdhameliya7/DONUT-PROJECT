@@ -1,5 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.email import EmailOperator
 from datetime import datetime
 import pandas as pd
 import glob
@@ -9,9 +10,10 @@ from ast import literal_eval
 from PIL import Image
 from google.cloud import storage
 from gcsfs import GCSFileSystem
-from gcs_utils import list_files_with_pattern, download_from_gcs
+from gcs_utils import *
 import fnmatch
 import subprocess
+import logging
 import sys
 import io
 
@@ -24,7 +26,7 @@ default_args = {
     'start_date': datetime(2024, 6, 25),
     'retries': 1,
 }
- 
+
 dag = DAG(
     'dvc_push_1',
     default_args=default_args,
@@ -32,51 +34,59 @@ dag = DAG(
     schedule_interval=None,
 )
 
-def push_data_to_dvc():
+def push_data_to_dvc(**kwargs):
+    logger = logging.getLogger("airflow.task")
     try:
         # Run the DVC add command
         result = subprocess.run(['dvc', 'add', 'data1'], capture_output=True, text=True)
-        
-        # Check if the DVC add command was successful
-        if result.returncode == 0:
-            print("DVC add successful.")
-            print(result.stdout)
+        logger.info(f"DVC add result: {result.stdout}")
 
-            # Track the added data with Git
+        if result.returncode == 0:
+            logger.info("DVC add successful.")
+            print("DVC add successful.")
+            
             git_add_result = subprocess.run(['git', 'add', 'data1.dvc'], capture_output=True, text=True)
+            logger.info(f"Git add result: {git_add_result.stdout}")
+            print("Git add successful.")
+            
             if git_add_result.returncode == 0:
-                print("Git add successful.")
-                print(git_add_result.stdout)
+                logger.info("Git add successful.")
                 
-                # Commit the changes
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 git_commit_result = subprocess.run(['git', 'commit', '-m', f'Added data file and tracked by git at {current_time}'], capture_output=True, text=True)
+                logger.info(f"Git commit result: {git_commit_result.stdout}")
+                
                 if git_commit_result.returncode == 0:
-                    print("Git commit successful.")
-                    print(git_commit_result.stdout)
+                    logger.info("Git commit successful.")
+                    print("Git commit successful..")
                     
-                    # Run the DVC push command
                     dvc_push_result = subprocess.run(['dvc', 'push'], capture_output=True, text=True)
+                    logger.info(f"DVC push result: {dvc_push_result.stdout}")
+                    
                     if dvc_push_result.returncode == 0:
+                        logger.info("DVC push successful.")
                         print("DVC push successful.")
-                        print(dvc_push_result.stdout)
                     else:
+                        logger.error("DVC push failed.")
                         print("DVC push failed.")
-                        print(dvc_push_result.stderr)
+                        logger.error(dvc_push_result.stderr)
+                        raise Exception("DVC push failed.")
                 else:
-                    print("Git commit failed.")
-                    print(git_commit_result.stderr)
+                    logger.error("Git commit failed.")
+                    logger.error(git_commit_result.stderr)
+                    raise Exception("Git commit failed.")
             else:
-                print("Git add failed.")
-                print(git_add_result.stderr)
+                logger.error("Git add failed.")
+                logger.error(git_add_result.stderr)
+                raise Exception("Git add failed.")
         else:
-            print("DVC add failed.")
-            print(result.stderr)
-
+            logger.error("DVC add failed.")
+            logger.error(result.stderr)
+            raise Exception("DVC add failed.")
+    
     except Exception as e:
-        print(f"An error occurred: {e}")
-        sys.exit(1)
-
+        logger.error(f"An error occurred: {e}")
+        raise
 
 push_data_dvc_task = PythonOperator(
     task_id='push_data_dvc',
@@ -84,5 +94,6 @@ push_data_dvc_task = PythonOperator(
     provide_context=True,
     dag=dag,
 )
+
 
 push_data_dvc_task
