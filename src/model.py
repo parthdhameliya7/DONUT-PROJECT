@@ -1,7 +1,6 @@
 from torchret import Model 
 import torch.nn as nn 
 import torch
-import json
 import re 
 from ast import literal_eval
 from src.dataset import DonutDataset
@@ -12,7 +11,6 @@ from typing import Optional, Dict
 from src.config import *
 import numpy as np 
 import neptune
-from neptune.utils import stringify_unsupported
 from neptune.types import File
 
 class DonutModel(Model):
@@ -51,7 +49,7 @@ class DonutModel(Model):
 
     def valid_one_step_logs(self, batch_id, data, logits, loss, metrics, temp_pred, temp_answer):
         self.run['valid/step-loss'].append(loss)
-        if batch_id % len(self.validloader) == 6:
+        if batch_id % 3 == 0:
             images = data['images']
             images = images.permute(0, 2, 3, 1).squeeze().cpu()
             for i in range(len(images)):

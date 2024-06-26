@@ -3,6 +3,7 @@ import pickle
 params = {
 
     #DATA PATH SETUP 
+    'data_dir' : None,
     'data_csv' : 'csvs/',
 
     'model_path' : 'models/donut_model_0_0_1.pt',
@@ -46,5 +47,5 @@ params = {
 
 }
 
-with open(f"special_tokens", "rb") as fp:   #Pickling
+with open(f"src/special_tokens", "rb") as fp:   #Pickling
     params['special_tokens'] = pickle.load(fp)
